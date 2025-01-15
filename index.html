@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login y Control Panel</title>
+
+    <!-- Importar Boostrap y Chart.Js (Graficos) -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Estilos personalizados -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Icono de la aplicacion -->
+    <link rel="shortcut icon" href="Images/Logo.webp" type="image/x-icon">
+  </head>
+
+  <body>
+    <!-- Contenedor de Login -->
+    <div class="login-container" id="login-container">
+      <h2 class="text-center mb-4">Iniciar Sesión</h2>
+      <div class="alert alert-danger hidden" id="login-alert">
+        Usuario o contraseña incorrectos.
+      </div>
+      <div class="mb-3">
+        <label for="username" class="form-label">Usuario</label>
+        <input
+          type="text"
+          id="username"
+          class="form-control"
+          placeholder="Ingresa tu usuario"
+        />
+      </div>
+      <div class="mb-3">
+        <label for="password" class="form-label">Contraseña</label>
+        <input
+          type="password"
+          id="password"
+          class="form-control"
+          placeholder="Ingresa tu contraseña"
+        />
+      </div>
+      <button class="btn btn-primary w-100" onclick="login()">Ingresar</button>
+    </div>
+
+    <!-- Panel de control -->
+    <div class="panel-container hidden" id="panel-container">
+      <h2 class="text-center mb-4">Panel de Control</h2>
+      <div class="card mb-3">
+        <div class="card-body">
+          <h3 class="card-title">Temperaturas y Humedad</h3>
+          <p>Temperatura: <span id="temperature" class="badge bg-primary">--</span> °C</p>
+          <p>Humedad: <span id="humidity" class="badge bg-info">--</span> %</p>
+          <div class="alert alert-warning hidden" id="humidity-alert">
+            ¡Alerta! Niveles de humedad elevados
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <h3 class="card-title">Control de Ventilador</h3>
+          <p>Velocidad actual: <span id="fan-speed-value">0</span>%</p>
+          <input type="range" class="form-range" id="fan-speed" min="0" max="100" step="1" disabled>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-body">
+          <canvas id="fanChart"></canvas>
+        </div>
+      </div>
+      
+      <button class="btn btn-danger w-100" onclick="logout()">Cerrar Sesión</button>
+    </div>
+
+    <script>
+      // Usuarios predefinidos
+      const users = [
+        { username: "admin", password: "1234" },
+        { username: "user", password: "abcd" },
+      ];
+
+      // Login
+      function login() {
+        const username = document.getElementById("username").value;
+        const password = document.getElementById("password").value;
+
+        const user = users.find(
+          (u) => u.username === username && u.password === password
+        );
+
+        if (user) {
+          // Oculta login y muestra panel
+          document.getElementById("login-container").classList.add("hidden");
+          document.getElementById("panel-container").classList.remove("hidden");
+          // Iniciar la recolección de datos
+          fetchData();
+        } else {
+          // Muestra alerta de error
+          document.getElementById("login-alert").classList.remove("hidden");
+        }
+      }
+
+      // Logout
+      function logout() {
+        document.getElementById("panel-container").classList.add("hidden");
+        document.getElementById("login-container").classList.remove("hidden");
+
+        // Limpia campos de login
+        document.getElementById("username").value = "";
+        document.getElementById("password").value = "";
+        document.getElementById("login-alert").classList.add("hidden");
+        
+        // Limpiar datos del gráfico
+        if (fanChart) {
+          fanChart.destroy();
+          temperatureHistory = [];
+          fanSpeedHistory = [];
+        }
+      }
+
+      let fanChart;
+      let temperatureHistory = [];
+      let fanSpeedHistory = [];
+
+      function initChart() {
+        const ctx = document.getElementById("fanChart").getContext("2d");
+        fanChart = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "Temperatura (°C)",
+                borderColor: "rgb(255, 99, 132)",
+                data: temperatureHistory,
+              },
+              {
+                label: "Velocidad Ventilador (%)",
+                borderColor: "rgb(54, 162, 235)",
+                data: fanSpeedHistory,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 100,
+              },
+            },
+          },
+        });
+      }
+
+      function updateFanSpeed(temperature) {
+        // Ajuste automático del ventilador basado en la temperatura
+        let speed;
+        if (temperature < 25) {
+          speed = 20;
+        } else if (temperature < 30) {
+          speed = 40;
+        } else if (temperature < 35) {
+          speed = 60;
+        } else if (temperature < 40) {
+          speed = 80;
+        } else {
+          speed = 100;
+        }
+
+        document.getElementById("fan-speed").value = speed;
+        document.getElementById("fan-speed-value").textContent = speed;
+        return speed;
+      }
+
+      function fetchData() {
+        initChart();
+        setInterval(() => {
+          const temperature = (20 + Math.random() * 15).toFixed(1);
+          const humidity = (30 + Math.random() * 70).toFixed(1);
+          const fanSpeed = updateFanSpeed(parseFloat(temperature));
+
+          document.getElementById("temperature").textContent = temperature;
+          document.getElementById("humidity").textContent = humidity;
+
+          // Actualizar históricos
+          const now = new Date();
+          const timeLabel =
+            now.getHours().toString().padStart(2, '0') + ":" + 
+            now.getMinutes().toString().padStart(2, '0') + ":" + 
+            now.getSeconds().toString().padStart(2, '0');
+
+          temperatureHistory.push(temperature);
+          fanSpeedHistory.push(fanSpeed);
+
+          if (temperatureHistory.length > 10) {
+            temperatureHistory.shift();
+            fanSpeedHistory.shift();
+            fanChart.data.labels.shift();
+          }
+
+          fanChart.data.labels.push(timeLabel);
+          fanChart.update();
+
+          if (humidity > 70) {
+            document.getElementById("humidity-alert").classList.remove("hidden");
+          } else {
+            document.getElementById("humidity-alert").classList.add("hidden");
+          }
+        }, 2000);
+      }
+    </script>
+  </body>
+</html>
